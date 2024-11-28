@@ -1,7 +1,7 @@
 import mysql.connector as con
 import pandas as pd
 
-# Veritabanı bağlantısını oluştur
+# Create a connection
 db_connection = con.connect(
     host="localhost",
     user="root",
@@ -9,14 +9,14 @@ db_connection = con.connect(
     database="new_schema",
 )
 
-# Bağlantı başarılıysa mesaj ver
+# Check the connection
 if db_connection.is_connected():
     print("Bağlantı başarılı!")
 
-# Cursor oluştur
+# Creating a Cursor
 cursor = db_connection.cursor()
 
-# INSERT sorgusu
+# INSERT
 sql_query = """
     INSERT INTO employees (EmployeeID, FirstName, LastName, Department, Salary, Email)
     VALUES
@@ -25,29 +25,30 @@ sql_query = """
 """
 
 try:
-    # Veriyi ekle
+    # Add Data
     cursor.execute(sql_query)
-    # Değişiklikleri kaydet
+
+    # Save the updates
     db_connection.commit()
 
-    print("Veriler başarıyla eklendi.")
+    print("Successfull.")
 except Exception as e:
-    # Hata durumunda rollback yap
+    # Rollback
     db_connection.rollback()
-    print(f"Hata oluştu: {e}")
+    print(f"Error: {e}")
 
-# Verileri sorgulama
+# Create a Query
 try:
     cursor.execute("SELECT FirstName FROM employees")
     data = cursor.fetchall()  # Verileri al
 
-    print("Veriler:")
+    print("Data:")
     for row in data:
         print(row)
 
 except Exception as e:
-    print(f"Sorgu hatası: {e}")
+    print(f"Query Error: {e}")
 
-# Bağlantıyı kapat
+# Close the connection
 db_connection.close()
 cursor.close()
