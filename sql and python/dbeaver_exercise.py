@@ -1,59 +1,95 @@
-import pandas as pd
-from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, insert
+from sqlalchemy import create_engine, text
 from flask import Flask, jsonify
+from sqlalchemy.orm import sessionmaker
+import psycopg2
+import pandas as pd
 
-# Flask Application
+filePath = "D:\\SampleData\\customer1.csv"
+myTableName = "customer1"
+username = "consultants"
+password = "WelcomeItc%402022"
+host = "18.132.73.146"
+databaseName = "testdb"
+port = 5432
+
 app = Flask(__name__)
 
-# Database Connection (with SQLAlchemy)
-DATABASE_URL = "postgresql://consultants:WelcomeItc%402022@18.132.73.146:5432/testdb"
-engine = create_engine(DATABASE_URL)
+def connect_to_postgres():
+    try:
+        # Create an engine to connect to PostgreSQL
+        # engine = create_engine(f'postgresql://{username}:{password}@{host}:{port}/{databaseName}')
+        engine = create_engine('postgresql://{username}:{password}@{host}:{port}/{databaseName}'.format(
+            username=username,
+            password=password,
+            host=host,
+            port=port,
+            databaseName=databaseName
+        ))
+        print("Connection to PostgreSQL established successfully.")
+        return engine
+    except Exception as error:
+        print("Error while connecting to PostgreSQL: {error}".format(error=error))
+        return None
 
-# Creating Table using SQLAlchemy Metadata
-metadata = MetaData()
-users_table = Table('users', metadata,
-    Column('id', Integer, primary_key=True),  # 'id' column as primary key
-    Column('name', String),                   # 'name' column as string type
-    Column('age', Integer)                    # 'age' column as integer type
-)
+def read_csv_file(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        print("CSV file read successfully from {file_path}".format(filePath = file_path))
+        return df
+    except Exception as error:
+        print("Error while reading CSV file: {error}")
+        return None
 
-# Create the Table in the database (if it doesn't already exist)
-metadata.create_all(engine)
+def write_to_postgres(engine, df, table_name, if_exists='replace'):
+    try:
+        # Write the DataFrame to the PostgreSQL table
+        df.to_sql(table_name, engine, if_exists=if_exists, index=False)
+        print("Data written to {table_name} successfully.")
+    except Exception as error:
+        print("Error while writing data to PostgreSQL: {error}")
 
-# Function to Load Data from CSV File to SQL Database
-def load_csv_to_sql(csv_file):
-    # Read CSV file using Pandas
-    df = pd.read_csv(csv_file)
-    # Load CSV data into the 'users' table in SQL
-    df.to_sql('users', engine, if_exists='append', index=False)  # Append data without the index column
-    print("CSV data successfully loaded into the database!")
+def close_connection(engine):
+    if engine:
+        engine.dispose()
+        print("PostgreSQL connection is closed.")
 
-# Function to Insert Data into Database
-def insert_data_to_db(name, age):
-    with engine.connect() as connection:
-        connection.execute(insert(users_table).values(name=name, age=age))  # Insert data into the 'users' table
-    print(f"Data added: {name}, {age}")
+# Route to fetch data from PostgreSQL database
+@app.route('/get_data', methods=['GET'])
+def get_data():
+    # Connect to the database
+    engine = connect_to_postgres()
+    if engine is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
 
-# Flask API: Fetch Data from the Database
-@app.route('/get_users', methods=['GET'])
-def get_users():
-    with engine.connect() as connection:
-        result = connection.execute("SELECT * FROM users").fetchall()  # Select all rows from the 'users' table
-    users = [{"id": row[0], "name": row[1], "age": row[2]} for row in result]  # Format the results as a list of dictionaries
-    return jsonify(users)  # Return the data as JSON
+    # Create a session
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-# Flask API: Load CSV Data into the Database
-@app.route('/load_csv', methods=['POST'])
-def load_csv():
-    # Here, I've hardcoded the file path. In a real scenario, you could upload the file via an API.
-    load_csv_to_sql(r'C:\Users\karab\Desktop\Self-Learning\self-learning-activities\sqlandpython\exercise.py')
-    return "CSV data successfully loaded!", 200
+    try:
+        # Example: Querying a table (replace 'your_table' with your actual table name)
+        result = session.execute(text('SELECT * FROM "customer1" LIMIT 10;'))
+        data = result.fetchall()
 
-# Main Application
-if __name__ == '__main__':
-    # Example Data Insertion
-    insert_data_to_db('John Doe', 30)  # Insert example data
-    insert_data_to_db('Jane Smith', 25)  # Insert example data
-    
-    # Start the Flask API
-    app.run(debug=True)
+        # Convert the query result into a list of dictionaries
+        result_list = [dict(zip(result.keys(), row)) for row in data]
+
+        # Return the result as JSON
+        return jsonify(result_list)
+
+    except Exception as error:
+        return jsonify({"error": "Error querying the database: error"}), 500
+    finally:
+        session.close()
+
+def main():
+    engine = connect_to_postgres()
+    if engine is not None:
+        df = read_csv_file(filePath)
+        if df is not None:
+            table_name = myTableName
+            write_to_postgres(engine, df, table_name)
+        close_connection(engine)
+
+if __name__ == "__main__":
+    main()
+    app.run(debug=False, port=5001)
