@@ -82,6 +82,7 @@ def get_data():
         session.close()
 
 def main():
+
     engine = connect_to_postgres()
     if engine is not None:
         df = read_csv_file(filePath)
@@ -92,4 +93,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    app.run(debug=False, port=5001)
+    app.run(host='0.0.0.0', port=5310, debug=True)
